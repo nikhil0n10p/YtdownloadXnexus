@@ -1,63 +1,25 @@
 import os
-from y2mate_api import Handler
-import requests
-import pytube
+import yt_dlp
 
-# Download the YouTube Video
-def download(bot, message, userInput, videoURL):
+def download(bot, message, quality, videoURL):
+    msg = bot.send_message(message.chat.id, "⏬ Downloading started...")
 
-    api = Handler(videoURL)
-    yt = pytube.YouTube(videoURL)
+    ydl_opts = {
+        'format': f'bestvideo[height={quality[:-1]}]+bestaudio/best/best',
+        'outtmpl': f'{videoURL[-10:]}.mp4',
+        'merge_output_format': 'mp4',
+        'quiet': True,
+    }
 
-    mediaPath = f"{os.getcwd()}/vids"
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([videoURL])
 
-    # Download the video using user's input
-    for video_metadata in api.run(quality=userInput):
-        # print(video_metadata)
-        
-        if not os.path.exists(mediaPath):
-            os.makedirs(mediaPath)
+        filename = f"{videoURL[-10:]}.mp4"
 
-        downloadMsg = bot.send_message(chat_id=message.chat.id, text="<b>Downloading...📥</b>")
+        with open(filename, 'rb') as video:
+            bot.send_video(message.chat.id, video, caption="✅ Video downloaded successfully.")
+        os.remove(filename)
 
-        vidFileName = f"{ video_metadata['vid'] }_{ video_metadata['q'] }.{ video_metadata['ftype'] }"
-
-        try:
-            # Start Downloading the Video
-            api.save(third_dict=video_metadata, dir="vids", naming_format=vidFileName, progress_bar=True)
-        except Exception as e:
-            bot.reply_to(message, f"Error downloading video: {e}")
-
-        bot.edit_message_text(chat_id=downloadMsg.chat.id, message_id=downloadMsg.message_id, text="<b>Uploading...📤</b>")
-
-        # Upload the video to Telegram
-        try:
-            print(vidFileName, "Uploading..")
-            bot.send_video(
-                message.chat.id, 
-                open(f"vids/{vidFileName}", 'rb'), 
-                thumb=requests.get(yt.thumbnail_url).content,
-                width=1920, 
-                height=1080,
-                # caption= f" <i>Thanks for Using @{bot.get_me().username }.</i> ", 
-                caption=f"""
-                <b>Title:</b><i> { yt.title } </i>
-<b>URL:</b><i> { videoURL } </i>
-<b>Quality:</b><i> { video_metadata['q'] } </i>
-
-<i><b>Thanks for Using @YoutubeDownloader4K0_bot.</b></i>""",
-            )
-
-            print("File was uploaded/sent to the User.")
-
-        except Exception as e:
-            bot.reply_to(message, f"Error uploading video: {e}")
-            print(vidFileName, f": Error uploading video: {e}")
-
-        bot.delete_message(downloadMsg.chat.id, downloadMsg.message_id)
-
-        # Delete the Media files after download.
-        os.remove(f"{mediaPath}/{vidFileName}")
-        print(vidFileName, ": Done!")
-        print("-------------------------------")
-        
+    except Exception as e:
+        bot.send_message(message.chat.id, f"❌ Error:\n<code>{str(e)}</code>", parse_mode="HTML")
