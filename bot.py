@@ -53,7 +53,7 @@ def send_welcome(message):
 def send_help(message):
     bot.reply_to(
         message,
-        "<b>Send a YouTube link and choose quality.</b>\n\n<i>Developer: @dev00111</i>",
+        "<b>Send a YouTube link and choose quality.</b>\n\n<i>Developer: @X_NexusWraith_X</i>",
         disable_web_page_preview=True
     )
 
