@@ -1,6 +1,6 @@
 import time
 from queue import Queue
-from modules.ytdownloader import download
+from ytdownloader import download
 
 download_queue = Queue()
 
