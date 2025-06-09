@@ -1,11 +1,10 @@
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import re
-from y2mate_api import Handler
-
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import yt_dlp
 
 def linkCheck(bot, message):
-
-    linkFilter = re.compile(r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+    # Extract YouTube link using regex
+    linkFilter = re.compile(r'(https?://[^\s]+)')
     userLinks = re.findall(linkFilter, message.text)
 
     yt_link = []
@@ -14,78 +13,44 @@ def linkCheck(bot, message):
             yt_link.append(link)
 
     if yt_link:
-        # bot.reply_to(message, "YouTube links found.")
-
-        # global videoURL
-        # global ytApi
-
         videoURL = yt_link[0]
-        
-
         qualityChecker(bot=bot, message=message, videoURL=videoURL)
-
     else:
-        bot.reply_to(message, "No YouTube links found!")
-
+        bot.reply_to(message, "❌ No valid YouTube link found!")
 
 def qualityChecker(bot, message, videoURL):
+    loadingMsg = bot.reply_to(message, "🔍 Looking for available qualities...")
 
-    qualityCheckerMsg = bot.reply_to(message, "Looking for Available Qualities..🔎")
+    ydl_opts = {'quiet': True, 'no_warnings': True}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(videoURL, download=False)
+        except Exception as e:
+            bot.reply_to(message, f"❌ Error:\n<code>{str(e)}</code>", parse_mode="HTML")
+            return
 
-    ytApi = Handler(videoURL)
-
-    q_list = ['4k', '1080p', '720p', '480p', '360p', '240p']
-    # q_list.reverse()
+    title = info.get('title', 'Untitled Video')
+    formats = info.get('formats', [])
 
     urlList = []
+    for f in formats:
+        if f.get('ext') == 'mp4' and f.get('height') and f.get('url'):
+            height = f['height']
+            size_bytes = f.get('filesize') or f.get('filesize_approx')
+            size_str = f"{round(size_bytes / (1024 * 1024), 1)} MB" if size_bytes else "Unknown"
+            urlList.append([f"{height}p", size_str, f['url']])
 
-    def getVidInfo(r):
-        for video_metadata in ytApi.run(quality=r):
-        
-            q = video_metadata.get("q")
-            dlink = video_metadata.get("dlink")
-            size = video_metadata.get("size")
-            
-            if dlink == None:
-                pass
-            else:
-                urlList.append([q, size, dlink])
-                # print(r, " fetched")
-                
-    # Iterate over q_list to check if res quality exist on that video
-    for r in q_list:
-        getVidInfo(r)
+    if not urlList:
+        bot.reply_to(message, "❌ No downloadable MP4 streams found.")
+        return
 
-    # print(urlList)
-
-    # Create a new list to show
     global showList
-    showList = {}
-    for count, item in enumerate(urlList, 1):
-        del item[2] # Remove dlink from list
-        q = item[0]
-        # print(i)
-        size = item[1] 
-        showList.update( { count: { "q":q, "size": size }} )
-    
-    # print(showList)
+    showList = []
+    markup = InlineKeyboardMarkup()
+    for count, item in enumerate(urlList[:6], 1):  # show only top 6 qualities
+        q, size, _ = item
+        showList.append(f"{q}#{videoURL}")
+        markup.add(InlineKeyboardButton(text=f"{q} ({size})", callback_data=f"{q}#{videoURL}"))
 
-
-    # Add Inline Buttons to get user input
-
-    def gen_markup():
-        markup = InlineKeyboardMarkup() 
-        for value in showList.values(): 
-            callbackData = f"{ value["q"] }#{ videoURL }"
-            button = InlineKeyboardButton(text=f"{value['q']} ({value['size']})", callback_data=callbackData)
-            markup.add(button)
-        return markup
-    
-
-    bot.delete_message(qualityCheckerMsg.chat.id, qualityCheckerMsg.message_id)
-
-    bot.reply_to(message=message, text="Choose a stream:", reply_markup=gen_markup())
-
-
-
-
+    bot.delete_message(loadingMsg.chat.id, loadingMsg.message_id)
+    bot.reply_to(message, f"<b>{title}</b>\nSelect quality to download:", reply_markup=markup, parse_mode="HTML")
