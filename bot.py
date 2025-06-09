@@ -7,7 +7,7 @@ from modules import checker, myqueues
 from dotenv import load_dotenv 
 load_dotenv()
 
-TOKEN = os.getenv("BOT_API_KEY")
+TOKEN = os.getenv("7454690320:AAGhkSHdml4zXQfI5dBRgl4X9JULxLuH0Fs")
 
 bot = telebot.TeleBot(TOKEN, parse_mode="HTML")
                       
